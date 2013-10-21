@@ -1237,6 +1237,10 @@ public class PackageManagerService extends IPackageManager.Stub
                         filter.hasDataScheme(IntentFilter.SCHEME_HTTPS));
     }
 
+    ArrayList<ComponentName> mDisabledComponentsList;
+
+    private AppOpsManager mAppOps;
+
     // Set of pending broadcasts for aggregating enable/disable of components.
     static class PendingPackageBroadcasts {
         // for each user id, a map of <package name -> components within that package>
@@ -2157,6 +2161,18 @@ public class PackageManagerService extends IPackageManager.Stub
                 notifyPackageAdded(packageName);
             }
 
+            if (!update && !isSystemApp(res.pkg)) {
+                boolean privacyGuard =
+                        android.provider.Settings.Secure.getIntForUser(
+                        mContext.getContentResolver(),
+                        android.provider.Settings.Secure.PRIVACY_GUARD_DEFAULT,
+                        0, UserHandle.USER_CURRENT) == 1;
+                if (privacyGuard) {
+                    mAppOps.setPrivacyGuardSettingForPackage(res.pkg.applicationInfo.uid,
+                            res.pkg.applicationInfo.packageName, true);
+                }
+            }
+
             // Log current value of "unknown sources" setting
             EventLog.writeEvent(EventLogTags.UNKNOWN_SOURCES_ENABLED,
                     getUnknownSourcesSettings());
@@ -2466,6 +2482,8 @@ public class PackageManagerService extends IPackageManager.Stub
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
         mSettings.addSharedUserLPw("android.uid.se", SE_UID,
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
+
+        mAppOps = context.getSystemService(AppOpsManager.class);
 
         String separateProcesses = SystemProperties.get("debug.separate_processes");
         if (separateProcesses != null && separateProcesses.length() > 0) {
