@@ -4920,6 +4920,15 @@ public final class Settings {
         public static final String ANSWER_VOLUME_BUTTON_BEHAVIOR_ANSWER = "call_volume_answer";
 
         /**
+         * Force full screen for devices with cutout
+         * @hide
+         */
+        public static final String FORCE_FULLSCREEN_CUTOUT_APPS = "force_full_screen_cutout_apps";
+
+         /** @hide */
+        private static final Validator FORCE_FULLSCREEN_CUTOUT_APPS_VALIDATOR = ANY_STRING_VALIDATOR;
+
+        /**
          * Settings to backup. This is here so that it's in the same place as the settings
          * keys and easy to update.
          *
@@ -5050,6 +5059,7 @@ public final class Settings {
             OMNI_VOLUME_BUTTON_MUSIC_CONTROL,
             OMNI_FACE_AUTO_UNLOCK,
             VOLUME_KEYS_CONTROL_RING_TONE,
+            FORCE_FULLSCREEN_CUTOUT_APPS
         };
 
         /**
@@ -5238,6 +5248,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(PROXIMITY_AUTO_SPEAKER_DELAY);
             PRIVATE_SETTINGS.add(PROXIMITY_AUTO_SPEAKER_INCALL_ONLY);
             PRIVATE_SETTINGS.add(VOLUME_KEYS_CONTROL_RING_TONE);
+            PRIVATE_SETTINGS.add(FORCE_FULLSCREEN_CUTOUT_APPS);
         }
 
         /**
@@ -5448,6 +5459,8 @@ public final class Settings {
             VALIDATORS.put(OMNI_FACE_AUTO_UNLOCK,
                     OMNI_FACE_AUTO_UNLOCK_VALIDATOR);
             VALIDATORS.put(VOLUME_KEYS_CONTROL_RING_TONE,VOLUME_KEYS_CONTROL_RING_TONE_VALIDATOR);
+            VALIDATORS.put(FORCE_FULLSCREEN_CUTOUT_APPS,
+                    FORCE_FULLSCREEN_CUTOUT_APPS_VALIDATOR);
         }
 
         /**
