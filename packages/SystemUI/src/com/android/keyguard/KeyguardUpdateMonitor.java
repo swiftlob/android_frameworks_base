@@ -29,6 +29,7 @@ import static android.os.BatteryManager.EXTRA_MAX_CHARGING_VOLTAGE;
 import static android.os.BatteryManager.EXTRA_VOLTAGE;
 import static android.os.BatteryManager.EXTRA_PLUGGED;
 import static android.os.BatteryManager.EXTRA_STATUS;
+import static android.os.BatteryManager.EXTRA_TEMPERATURE;
 
 import android.annotation.AnyThread;
 import android.annotation.MainThread;
@@ -781,6 +782,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                 final int level = intent.getIntExtra(EXTRA_LEVEL, 0);
                 final int health = intent.getIntExtra(EXTRA_HEALTH, BATTERY_HEALTH_UNKNOWN);
 
+                double currBatteryTemp = intent.getIntExtra(EXTRA_TEMPERATURE, -1);
                 final int maxChargingMicroAmp = intent.getIntExtra(EXTRA_MAX_CHARGING_CURRENT, -1);
                 int maxChargingMicroVolt = intent.getIntExtra(EXTRA_MAX_CHARGING_VOLTAGE, -1);
                 double currChargingVoltage = intent.getIntExtra(EXTRA_VOLTAGE, -1);
@@ -800,10 +802,10 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                 }
                 if (DEBUG) Log.d(TAG, "maxChargingMicroAmp = " + maxChargingMicroAmp +
                         " maxChargingMicroVolt = " + maxChargingMicroVolt + " maxChargingMicroWatt = " +
-                        maxChargingMicroWatt);
+                        maxChargingMicroWatt + " currBatteryTemp = " + currBatteryTemp);
                 final Message msg = mHandler.obtainMessage(
                         MSG_BATTERY_UPDATE, new BatteryStatus(status, level, plugged, health,
-                                maxChargingMicroWatt, currChargingVoltage));
+                                maxChargingMicroWatt, currChargingVoltage, currBatteryTemp));
                 mHandler.sendMessage(msg);
             } else if (TelephonyIntents.ACTION_SIM_STATE_CHANGED.equals(action)) {
                 SimData args = SimData.fromIntent(intent);
@@ -1007,14 +1009,16 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         public final int health;
         public final int maxChargingWattage;
         public final double currChargingVolt;
+        public final double currBatteryTemp;
         public BatteryStatus(int status, int level, int plugged, int health,
-                int maxChargingWattage, double currChargingVolt) {
+                int maxChargingWattage, double currChargingVolt, double currBatteryTemp) {
             this.status = status;
             this.level = level;
             this.plugged = plugged;
             this.health = health;
             this.maxChargingWattage = maxChargingWattage;
             this.currChargingVolt = currChargingVolt;
+            this.currBatteryTemp = currBatteryTemp;
         }
 
         /**
@@ -1201,7 +1205,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
 
         // Take a guess at initial SIM state, battery status and PLMN until we get an update
-        mBatteryStatus = new BatteryStatus(BATTERY_STATUS_UNKNOWN, 100, 0, 0, 0, 0);
+        mBatteryStatus = new BatteryStatus(BATTERY_STATUS_UNKNOWN, 100, 0, 0, 0, 0, 0);
 
         // Watch for interesting updates
         final IntentFilter filter = new IntentFilter();
@@ -1590,13 +1594,25 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     + slotId + ", state=" + state +")");
         }
 
+        boolean becameAbsent = false;
         if (!SubscriptionManager.isValidSubscriptionId(subId)) {
             Log.w(TAG, "invalid subId in handleSimStateChange()");
             /* Only handle No SIM(ABSENT) due to handleServiceStateChange() handle other case */
             if (state == State.ABSENT) {
                 updateTelephonyCapable(true);
+                // Even though the subscription is not valid anymore, we need to notify that the
+                // SIM card was removed so we can update the UI.
+                becameAbsent = true;
+                for (SimData data : mSimDatas.values()) {
+                    // Set the SIM state of all SimData associated with that slot to ABSENT se we
+                    // do not move back into PIN/PUK locked and not detect the change below.
+                    if (data.slotId == slotId) {
+                        data.simState = State.ABSENT;
+                    }
+                }
+            } else {
+                return;
             }
-            return;
         }
 
         SimData data = mSimDatas.get(subId);
@@ -1611,7 +1627,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             data.subId = subId;
             data.slotId = slotId;
         }
-        if (changed && state != State.UNKNOWN) {
+        if ((changed || becameAbsent) && state != State.UNKNOWN) {
             for (int i = 0; i < mCallbacks.size(); i++) {
                 KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
                 if (cb != null) {
